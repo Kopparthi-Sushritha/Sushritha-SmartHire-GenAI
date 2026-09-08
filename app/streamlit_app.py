@@ -1,10 +1,21 @@
-"""SmartHire GenAI portal (Streamlit). Run: streamlit run app/streamlit_app.py
+"""SmartHire GenAI portal (Streamlit).
 
-Build this LAST. It only wires together pieces that already work in src/:
-    upload CV -> parsed profile -> matched jobs -> CV suggestions -> mentor chat.
-Cache the FAISS index / chain with @st.cache_resource so it is not rebuilt on every
-interaction, and read the API key from st.secrets (not the .env file) once deployed.
+Run:
+    streamlit run app/streamlit_app.py
+
+Flow:
+    upload CV
+        ↓
+    parsed profile
+        ↓
+    matched jobs
+        ↓
+    CV suggestions
+        ↓
+    AI Career Mentor
 """
+
+
 import sys
 import tempfile
 from pathlib import Path
@@ -16,10 +27,17 @@ import streamlit as st
 # PROJECT ROOT
 # ============================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(
+    __file__
+).resolve().parents[1]
+
 
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT)
+    )
 
 
 # ============================================================
@@ -41,9 +59,7 @@ from src.generate.cv_suggestions import (
     generate_cv_suggestions,
 )
 
-# IMPORTANT:
-# Use ask_mentor because this is the public function
-# provided by your actual RAG chain.
+# Keep your existing RAG chain.
 from src.mentor.rag_chain import ask_mentor
 
 
@@ -52,8 +68,11 @@ from src.mentor.rag_chain import ask_mentor
 # ============================================================
 
 st.set_page_config(
+
     page_title="SmartHire GenAI",
+
     page_icon="💼",
+
     layout="wide",
 )
 
@@ -63,22 +82,27 @@ st.set_page_config(
 # ============================================================
 
 if "resume_text" not in st.session_state:
+
     st.session_state.resume_text = ""
 
 
 if "resume_profile" not in st.session_state:
+
     st.session_state.resume_profile = None
 
 
 if "job_matches" not in st.session_state:
+
     st.session_state.job_matches = []
 
 
 if "cv_suggestions" not in st.session_state:
+
     st.session_state.cv_suggestions = None
 
 
 if "messages" not in st.session_state:
+
     st.session_state.messages = []
 
 
@@ -86,11 +110,15 @@ if "messages" not in st.session_state:
 # TITLE
 # ============================================================
 
-st.title("💼 SmartHire GenAI")
+st.title(
+    "💼 SmartHire GenAI"
+)
+
 
 st.write(
     "Resume Matching & AI Career Mentor"
 )
+
 
 st.divider()
 
@@ -101,17 +129,27 @@ st.divider()
 
 with st.sidebar:
 
-    st.header("📄 Resume Analysis")
+    st.header(
+        "📄 Resume Analysis"
+    )
 
 
     uploaded_file = st.file_uploader(
+
         "Upload your resume",
-        type=["pdf", "docx", "txt"],
+
+        type=[
+            "pdf",
+            "docx",
+            "txt",
+        ],
     )
 
 
     analyze_button = st.button(
+
         "🔍 Analyze Resume",
+
         use_container_width=True,
     )
 
@@ -128,6 +166,7 @@ if analyze_button:
             "Please upload a resume first."
         )
 
+
     else:
 
         try:
@@ -142,8 +181,11 @@ if analyze_button:
 
 
             with tempfile.NamedTemporaryFile(
+
                 delete=False,
+
                 suffix=suffix,
+
             ) as temp_file:
 
                 temp_file.write(
@@ -171,6 +213,7 @@ if analyze_button:
                 st.error(
                     "Could not extract text from the resume."
                 )
+
 
             else:
 
@@ -202,27 +245,15 @@ if analyze_button:
 
 
                 # ------------------------------------------------
-                # Generate CV suggestions
+                # IMPORTANT
+                #
+                # CV suggestions are NOT generated automatically.
+                # They are generated only when the user clicks:
+                #
+                # "✨ Generate CV Suggestions"
                 # ------------------------------------------------
 
-                with st.spinner(
-                    "Generating CV suggestions..."
-                ):
-
-                    if job_matches:
-
-                        target_job = job_matches[0]
-
-                        cv_suggestions = (
-                            generate_cv_suggestions(
-                                resume_profile,
-                                target_job,
-                            )
-                        )
-
-                    else:
-
-                        cv_suggestions = None
+                cv_suggestions = None
 
 
                 # ------------------------------------------------
@@ -275,6 +306,7 @@ if analyze_button:
 if not st.session_state.resume_profile:
 
     st.info(
+
         "👈 Upload your resume from the sidebar "
         "and click **Analyze Resume** to get started."
     )
@@ -286,7 +318,9 @@ else:
     # RESUME PROFILE
     # ========================================================
 
-    st.header("👤 Resume Profile")
+    st.header(
+        "👤 Resume Profile"
+    )
 
 
     profile = (
@@ -303,23 +337,33 @@ else:
 
     with col1:
 
-        st.subheader("Name")
+        st.subheader(
+            "Name"
+        )
 
 
         st.write(
+
             profile.get(
+
                 "name",
+
                 "Not available",
             )
         )
 
 
-        st.subheader("Target Role")
+        st.subheader(
+            "Target Role"
+        )
 
 
         st.write(
+
             profile.get(
+
                 "target_role",
+
                 "Not available",
             )
         )
@@ -331,7 +375,9 @@ else:
 
     with col2:
 
-        st.subheader("Skills")
+        st.subheader(
+            "Skills"
+        )
 
 
         skills = profile.get(
@@ -346,6 +392,7 @@ else:
                 ", ".join(skills)
             )
 
+
         else:
 
             st.write(
@@ -357,11 +404,15 @@ else:
     # EXPERIENCE
     # ========================================================
 
-    st.subheader("💼 Experience")
+    st.subheader(
+        "💼 Experience"
+    )
 
 
     experience = profile.get(
+
         "experience",
+
         [],
     )
 
@@ -371,24 +422,31 @@ else:
         for exp in experience:
 
             company = exp.get(
+
                 "company",
+
                 "Unknown company",
             )
 
 
             role = exp.get(
+
                 "role",
+
                 "Unknown role",
             )
 
 
             duration = exp.get(
+
                 "duration",
+
                 "",
             )
 
 
             st.markdown(
+
                 f"**{role} — {company}**"
             )
 
@@ -401,7 +459,9 @@ else:
 
 
             highlights = exp.get(
+
                 "highlights",
+
                 [],
             )
 
@@ -424,11 +484,15 @@ else:
     # EDUCATION
     # ========================================================
 
-    st.subheader("🎓 Education")
+    st.subheader(
+        "🎓 Education"
+    )
 
 
     education = profile.get(
+
         "education",
+
         [],
     )
 
@@ -438,24 +502,31 @@ else:
         for edu in education:
 
             degree = edu.get(
+
                 "degree",
+
                 "Unknown degree",
             )
 
 
             institute = edu.get(
+
                 "institute",
+
                 "Unknown institute",
             )
 
 
             year = edu.get(
+
                 "year",
+
                 "",
             )
 
 
             st.markdown(
+
                 f"**{degree}** — {institute}"
             )
 
@@ -481,7 +552,9 @@ else:
     # MATCHING JOBS
     # ========================================================
 
-    st.header("🎯 Matching Jobs")
+    st.header(
+        "🎯 Matching Jobs"
+    )
 
 
     job_matches = (
@@ -494,40 +567,52 @@ else:
         for job in job_matches:
 
             rank = job.get(
+
                 "rank",
+
                 "",
             )
 
 
             title = job.get(
+
                 "jobtitle",
+
                 "Job",
             )
 
 
             score = job.get(
+
                 "similarity_score",
+
                 0,
             )
 
 
             skills = job.get(
+
                 "skills",
+
                 "",
             )
 
 
             description = job.get(
+
                 "jobdescription",
+
                 "",
             )
 
 
             with st.expander(
+
                 f"{rank}. {title}"
             ):
 
                 st.write(
+
                     f"**Similarity Score:** "
                     f"{score:.4f}"
                 )
@@ -536,6 +621,7 @@ else:
                 if skills:
 
                     st.write(
+
                         f"**Skills:** {skills}"
                     )
 
@@ -543,6 +629,7 @@ else:
                 if description:
 
                     st.write(
+
                         f"**Description:** {description}"
                     )
 
@@ -561,10 +648,91 @@ else:
     # CV SUGGESTIONS
     # ========================================================
 
-    st.header("📝 CV Suggestions")
+    st.header(
+        "📝 CV Suggestions"
+    )
 
+
+    # ========================================================
+    # GENERATE BUTTON
+    # ========================================================
+
+    generate_cv_button = st.button(
+
+        "✨ Generate CV Suggestions",
+
+        use_container_width=False
+    )
+
+
+    # ========================================================
+    # GENERATE ONLY WHEN BUTTON IS CLICKED
+    # ========================================================
+
+    if generate_cv_button:
+
+        if not st.session_state.job_matches:
+
+            st.warning(
+
+                "No matching jobs found. "
+                "Please analyze your resume first."
+            )
+
+
+        elif not st.session_state.resume_profile:
+
+            st.warning(
+                "Please analyze your resume first."
+            )
+
+
+        else:
+
+            try:
+
+                with st.spinner(
+
+                    "Generating CV suggestions..."
+                ):
+
+                    target_job = (
+
+                        st.session_state.job_matches[0]
+                    )
+
+
+                    cv_suggestions = (
+
+                        generate_cv_suggestions(
+
+                            st.session_state.resume_profile,
+
+                            target_job,
+                        )
+                    )
+
+
+                    st.session_state.cv_suggestions = (
+
+                        cv_suggestions
+                    )
+
+
+            except Exception as e:
+
+                st.error(
+
+                    f"Error generating CV suggestions: {e}"
+                )
+
+
+    # ========================================================
+    # DISPLAY CV SUGGESTIONS
+    # ========================================================
 
     suggestions = (
+
         st.session_state.cv_suggestions
     )
 
@@ -581,7 +749,9 @@ else:
 
 
         missing_skills = suggestions.get(
+
             "missing_skills",
+
             [],
         )
 
@@ -593,6 +763,7 @@ else:
                 st.write(
                     f"• {skill}"
                 )
+
 
         else:
 
@@ -611,7 +782,9 @@ else:
 
 
         weak_bullets = suggestions.get(
+
             "weak_bullet_points",
+
             [],
         )
 
@@ -623,6 +796,7 @@ else:
                 st.write(
                     f"• {bullet}"
                 )
+
 
         else:
 
@@ -641,7 +815,9 @@ else:
 
 
         rewritten_summary = suggestions.get(
+
             "rewritten_summary",
+
             "",
         )
 
@@ -651,6 +827,7 @@ else:
             st.write(
                 rewritten_summary
             )
+
 
         else:
 
@@ -662,7 +839,9 @@ else:
     else:
 
         st.info(
-            "No CV suggestions available."
+
+            "Click **✨ Generate CV Suggestions** "
+            "to get AI-powered suggestions for your resume."
         )
 
 
@@ -673,10 +852,13 @@ else:
     # AI CAREER MENTOR
     # ========================================================
 
-    st.header("🤖 AI Career Mentor")
+    st.header(
+        "🤖 AI Career Mentor"
+    )
 
 
     st.write(
+
         "Ask questions about careers, jobs, skills, "
         "resumes, interviews, and professional development."
     )
@@ -689,10 +871,12 @@ else:
     for message in st.session_state.messages:
 
         with st.chat_message(
+
             message["role"]
         ):
 
             st.write(
+
                 message["content"]
             )
 
@@ -702,6 +886,7 @@ else:
     # ========================================================
 
     question = st.chat_input(
+
         "Ask your career question..."
     )
 
@@ -724,6 +909,7 @@ else:
         if not allowed:
 
             st.warning(
+
                 f"🛡️ {guardrail_message}"
             )
 
@@ -735,11 +921,17 @@ else:
             # =================================================
 
             if (
-                is_resume_specific_question(question)
+
+                is_resume_specific_question(
+                    question
+                )
+
                 and not st.session_state.resume_profile
+
             ):
 
                 st.warning(
+
                     "Please upload and analyze your resume "
                     "before asking resume-specific questions."
                 )
@@ -752,9 +944,13 @@ else:
                 # ------------------------------------------------
 
                 st.session_state.messages.append(
+
                     {
+
                         "role": "user",
+
                         "content": question,
+
                     }
                 )
 
@@ -763,7 +959,9 @@ else:
                 # Display user question
                 # ------------------------------------------------
 
-                with st.chat_message("user"):
+                with st.chat_message(
+                    "user"
+                ):
 
                     st.write(
                         question
@@ -774,7 +972,9 @@ else:
                 # AI Mentor
                 # ------------------------------------------------
 
-                with st.chat_message("assistant"):
+                with st.chat_message(
+                    "assistant"
+                ):
 
                     with st.spinner(
                         "Thinking..."
@@ -783,7 +983,7 @@ else:
                         try:
 
                             # ====================================
-                            # CALL YOUR ACTUAL RAG CHAIN
+                            # YOUR EXISTING RAG CHAIN
                             # ====================================
 
                             result = ask_mentor(
@@ -796,7 +996,9 @@ else:
                             # ------------------------------------------------
 
                             answer = result.get(
+
                                 "answer",
+
                                 "I don't know based on the provided career notes.",
                             )
 
@@ -815,7 +1017,9 @@ else:
                             # ------------------------------------------------
 
                             sources = result.get(
+
                                 "sources",
+
                                 []
                             )
 
@@ -830,18 +1034,25 @@ else:
                                 for source in sources:
 
                                     if isinstance(
+
                                         source,
+
                                         dict,
+
                                     ):
 
                                         source_name = source.get(
+
                                             "source",
+
                                             "Career notes",
                                         )
 
 
                                         score = source.get(
+
                                             "score",
+
                                             None,
                                         )
 
@@ -849,19 +1060,24 @@ else:
                                         if score is not None:
 
                                             st.write(
+
                                                 f"• {source_name} "
                                                 f"(score: {score:.4f})"
                                             )
 
+
                                         else:
 
                                             st.write(
+
                                                 f"• {source_name}"
                                             )
+
 
                                     else:
 
                                         st.write(
+
                                             f"• {source}"
                                         )
 
@@ -871,9 +1087,13 @@ else:
                             # ------------------------------------------------
 
                             st.session_state.messages.append(
+
                                 {
+
                                     "role": "assistant",
+
                                     "content": answer,
+
                                 }
                             )
 
@@ -881,6 +1101,7 @@ else:
                         except Exception as e:
 
                             error_message = (
+
                                 f"Sorry, something went wrong: {e}"
                             )
 
@@ -891,8 +1112,12 @@ else:
 
 
                             st.session_state.messages.append(
+
                                 {
+
                                     "role": "assistant",
+
                                     "content": error_message,
+
                                 }
                             )

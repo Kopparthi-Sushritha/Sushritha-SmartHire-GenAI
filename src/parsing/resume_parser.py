@@ -1,18 +1,12 @@
 """Module 1 — Resume parser.
 
-Read an uploaded resume (via loader.load_text), send it to the LLM with a strict
-prompt, and get back clean JSON: name, skills, experience, education, target_role.
-Validate the JSON before returning it. Build this in notebook 01, then move the
-working function here. Use structured output (the JSON-parser technique from class).
-"""
-
-"""Module 1 — Resume parser.
-
 Read an uploaded resume using loader.load_text(), send it to the LLM
-with the resume parsing prompt from src/prompts.py, and return
-validated structured JSON containing:
+with the resume parsing prompt, and return validated structured JSON
+containing:
 
 name, skills, experience, education, target_role.
+
+Uses Gemini structured output.
 """
 
 import sys
@@ -20,6 +14,9 @@ import os
 import json
 from pathlib import Path
 from typing import TypedDict, List
+
+import streamlit as st
+
 
 # ============================================================
 # 1. FIND PROJECT ROOT
@@ -48,14 +45,35 @@ from src.generate.prompts import RESUME_PARSE_PROMPT
 # 3. LOAD API KEY
 # ============================================================
 
-env_file = PROJECT_ROOT / ".env.example"
-load_dotenv(env_file)
+# Load local .env file first.
+env_file = PROJECT_ROOT / ".env"
 
-api_key = os.getenv(config.API_KEY_ENV)
+if env_file.exists():
+    load_dotenv(env_file)
 
+
+# Try local .env first.
+api_key = os.getenv("GOOGLE_API_KEY")
+
+
+# If .env does not contain the key,
+# try Streamlit Cloud Secrets.
 if not api_key:
+
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+
+    except Exception:
+        api_key = None
+
+
+# Stop with a clear error if no key exists.
+if not api_key:
+
     raise ValueError(
-        f"{config.API_KEY_ENV} not found in .env.example"
+        f"{config.API_KEY_ENV} not found. "
+        "For local use, add GOOGLE_API_KEY to .env. "
+        "For Streamlit Cloud, add GOOGLE_API_KEY to Secrets."
     )
 
 
@@ -63,7 +81,10 @@ if not api_key:
 # 4. CONNECT TO GEMINI
 # ============================================================
 
-client = genai.Client(api_key=api_key)
+client = genai.Client(
+    api_key=api_key
+)
+
 
 # Model comes from config.py
 MODEL = config.CHAT_MODEL
@@ -74,6 +95,7 @@ MODEL = config.CHAT_MODEL
 # ============================================================
 
 class Education(TypedDict):
+
     degree: str
     institute: str
     year: str
@@ -81,6 +103,7 @@ class Education(TypedDict):
 
 
 class Experience(TypedDict):
+
     company: str
     role: str
     duration: str
@@ -88,6 +111,7 @@ class Experience(TypedDict):
 
 
 class Resume(TypedDict):
+
     name: str
     skills: List[str]
     experience: List[Experience]
@@ -100,6 +124,7 @@ class Resume(TypedDict):
 # ============================================================
 
 def validate_resume(data: dict) -> Resume:
+
     """Validate the structured resume returned by Gemini."""
 
     required_fields = {
@@ -107,122 +132,212 @@ def validate_resume(data: dict) -> Resume:
         "skills",
         "experience",
         "education",
-        "target_role"
+        "target_role",
     }
 
+
+    # --------------------------------------------------------
     # Check required top-level fields
-    missing_fields = required_fields - set(data.keys())
+    # --------------------------------------------------------
+
+    missing_fields = (
+        required_fields - set(data.keys())
+    )
+
 
     if missing_fields:
+
         raise ValueError(
             f"Missing required resume fields: {missing_fields}"
         )
 
+
+    # --------------------------------------------------------
     # Check top-level types
+    # --------------------------------------------------------
+
     if not isinstance(data["name"], str):
-        raise ValueError("name must be a string")
+
+        raise ValueError(
+            "name must be a string"
+        )
+
 
     if not isinstance(data["skills"], list):
-        raise ValueError("skills must be a list")
+
+        raise ValueError(
+            "skills must be a list"
+        )
+
 
     if not isinstance(data["experience"], list):
-        raise ValueError("experience must be a list")
+
+        raise ValueError(
+            "experience must be a list"
+        )
+
 
     if not isinstance(data["education"], list):
-        raise ValueError("education must be a list")
+
+        raise ValueError(
+            "education must be a list"
+        )
+
 
     if not isinstance(data["target_role"], str):
-        raise ValueError("target_role must be a string")
 
-    # --------------------------------------------------------
+        raise ValueError(
+            "target_role must be a string"
+        )
+
+
+    # ========================================================
     # Validate experience
-    # --------------------------------------------------------
+    # ========================================================
 
     experience_fields = {
         "company",
         "role",
         "duration",
-        "highlights"
+        "highlights",
     }
+
 
     for experience in data["experience"]:
 
         if not isinstance(experience, dict):
+
             raise ValueError(
                 "Each experience item must be a dictionary"
             )
 
-        missing = experience_fields - set(experience.keys())
+
+        missing = (
+            experience_fields
+            - set(experience.keys())
+        )
+
 
         if missing:
+
             raise ValueError(
                 f"Experience item missing fields: {missing}"
             )
 
-        if not isinstance(experience["company"], str):
+
+        if not isinstance(
+            experience["company"],
+            str,
+        ):
+
             raise ValueError(
                 "experience.company must be a string"
             )
 
-        if not isinstance(experience["role"], str):
+
+        if not isinstance(
+            experience["role"],
+            str,
+        ):
+
             raise ValueError(
                 "experience.role must be a string"
             )
 
-        if not isinstance(experience["duration"], str):
+
+        if not isinstance(
+            experience["duration"],
+            str,
+        ):
+
             raise ValueError(
                 "experience.duration must be a string"
             )
 
-        if not isinstance(experience["highlights"], list):
+
+        if not isinstance(
+            experience["highlights"],
+            list,
+        ):
+
             raise ValueError(
                 "experience.highlights must be a list"
             )
 
-    # --------------------------------------------------------
+
+    # ========================================================
     # Validate education
-    # --------------------------------------------------------
+    # ========================================================
 
     education_fields = {
         "degree",
         "institute",
         "year",
-        "score"
+        "score",
     }
+
 
     for education in data["education"]:
 
         if not isinstance(education, dict):
+
             raise ValueError(
                 "Each education item must be a dictionary"
             )
 
-        missing = education_fields - set(education.keys())
+
+        missing = (
+            education_fields
+            - set(education.keys())
+        )
+
 
         if missing:
+
             raise ValueError(
                 f"Education item missing fields: {missing}"
             )
 
-        if not isinstance(education["degree"], str):
+
+        if not isinstance(
+            education["degree"],
+            str,
+        ):
+
             raise ValueError(
                 "education.degree must be a string"
             )
 
-        if not isinstance(education["institute"], str):
+
+        if not isinstance(
+            education["institute"],
+            str,
+        ):
+
             raise ValueError(
                 "education.institute must be a string"
             )
 
-        if not isinstance(education["year"], str):
+
+        if not isinstance(
+            education["year"],
+            str,
+        ):
+
             raise ValueError(
                 "education.year must be a string"
             )
 
-        if not isinstance(education["score"], str):
+
+        if not isinstance(
+            education["score"],
+            str,
+        ):
+
             raise ValueError(
                 "education.score must be a string"
             )
+
 
     return data
 
@@ -232,51 +347,97 @@ def validate_resume(data: dict) -> Resume:
 # ============================================================
 
 def parse_resume(text: str) -> Resume:
+
     """Parse resume text using Gemini structured output."""
 
     if not isinstance(text, str):
-        raise TypeError("Resume text must be a string.")
+
+        raise TypeError(
+            "Resume text must be a string."
+        )
+
 
     text = text.strip()
 
-    if not text:
-        raise ValueError("Resume text cannot be empty.")
 
-    # Get prompt from src/prompts.py
+    if not text:
+
+        raise ValueError(
+            "Resume text cannot be empty."
+        )
+
+
+    # --------------------------------------------------------
+    # Get prompt
+    # --------------------------------------------------------
+
     prompt = RESUME_PARSE_PROMPT + f"""
 
 RESUME:
 
 {text}
+
 """
 
+
+    # --------------------------------------------------------
+    # Gemini structured output
+    # --------------------------------------------------------
+
     response = client.models.generate_content(
+
         model=MODEL,
+
         contents=prompt,
+
         config=types.GenerateContentConfig(
+
             response_mime_type="application/json",
+
             response_schema=Resume,
+
             temperature=0.2,
-            max_output_tokens=2048
-        )
+
+            max_output_tokens=2048,
+        ),
     )
 
+
+    # --------------------------------------------------------
+    # Check response
+    # --------------------------------------------------------
+
     if not response.text:
+
         raise ValueError(
             "Gemini returned an empty response."
         )
 
+
+    # --------------------------------------------------------
     # Convert JSON string to Python dictionary
+    # --------------------------------------------------------
+
     try:
-        parsed_data = json.loads(response.text)
+
+        parsed_data = json.loads(
+            response.text
+        )
 
     except json.JSONDecodeError as e:
+
         raise ValueError(
             f"Gemini returned invalid JSON: {e}"
         )
 
+
+    # --------------------------------------------------------
     # Validate before returning
-    return validate_resume(parsed_data)
+    # --------------------------------------------------------
+
+    return validate_resume(
+        parsed_data
+    )
 
 
 # ============================================================
@@ -284,12 +445,16 @@ RESUME:
 # ============================================================
 
 def parse_resume_file(path) -> Resume:
+
     """Load a resume file using loader.py and parse it."""
 
-    # loader.py converts PDF/DOCX/TXT/MD to plain text
-    resume_text = load_text(path)
+    resume_text = load_text(
+        path
+    )
 
-    return parse_resume(resume_text)
+    return parse_resume(
+        resume_text
+    )
 
 
 # ============================================================
@@ -299,59 +464,120 @@ def parse_resume_file(path) -> Resume:
 if __name__ == "__main__":
 
     print("=" * 60)
-    print("SMART HIRE - RESUME PARSER")
+
+    print(
+        "SMART HIRE - RESUME PARSER"
+    )
+
     print("=" * 60)
+
 
     resume_folder = config.RESUMES_DIR
 
+
     if not resume_folder.exists():
+
         raise FileNotFoundError(
             f"Resume folder not found: {resume_folder}"
         )
 
+
     resume_files = [
+
         file
+
         for file in resume_folder.iterdir()
+
         if file.suffix.lower()
-        in [".pdf", ".docx", ".txt", ".md"]
+        in [
+            ".pdf",
+            ".docx",
+            ".txt",
+            ".md",
+        ]
     ]
 
-    print(f"\nResumes found: {len(resume_files)}")
+
+    print(
+        f"\nResumes found: {len(resume_files)}"
+    )
+
 
     for file in resume_files:
-        print("-", file.name)
 
-    # --------------------------------------------------------
+        print(
+            "-",
+            file.name
+        )
+
+
+    # ========================================================
     # Process all resumes
-    # --------------------------------------------------------
+    # ========================================================
 
     for file in resume_files:
 
-        print("\n" + "=" * 60)
-        print("PROCESSING:", file.name)
-        print("=" * 60)
+        print(
+            "\n" + "=" * 60
+        )
+
+        print(
+            "PROCESSING:",
+            file.name
+        )
+
+        print(
+            "=" * 60
+        )
+
 
         try:
 
-            parsed_data = parse_resume_file(file)
+            parsed_data = parse_resume_file(
+                file
+            )
 
-            print("\nSTRUCTURED OUTPUT:")
 
             print(
+                "\nSTRUCTURED OUTPUT:"
+            )
+
+
+            print(
+
                 json.dumps(
+
                     parsed_data,
+
                     indent=2,
-                    ensure_ascii=False
+
+                    ensure_ascii=False,
                 )
             )
 
-            print("\nVALIDATION: SUCCESS")
+
+            print(
+                "\nVALIDATION: SUCCESS"
+            )
+
 
         except Exception as e:
 
-            print("\nERROR:")
+            print(
+                "\nERROR:"
+            )
+
             print(e)
 
-    print("\n" + "=" * 60)
-    print("RESUME PARSER COMPLETED")
-    print("=" * 60)
+
+    print(
+        "\n" + "=" * 60
+    )
+
+    print(
+        "RESUME PARSER COMPLETED"
+    )
+
+    print(
+        "=" * 60
+    )

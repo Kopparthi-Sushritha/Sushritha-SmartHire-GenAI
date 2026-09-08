@@ -45,11 +45,11 @@ from src.generate.prompts import RESUME_PARSE_PROMPT
 # 3. LOAD API KEY
 # ============================================================
 
-# Load local .env file first.
-env_file = PROJECT_ROOT / ".env"
+# Load .env.example file
+env_file = PROJECT_ROOT / ".env.example"
 
 if env_file.exists():
-    load_dotenv(env_file)
+    load_dotenv(env_file, override=True)
 
 
 # Try local .env first.

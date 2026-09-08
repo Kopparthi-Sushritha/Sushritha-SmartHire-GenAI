@@ -16,10 +16,13 @@ Flow:
 """
 
 
+import os
+import re
 import sys
 import tempfile
 from pathlib import Path
 
+from dotenv import load_dotenv
 import streamlit as st
 
 
@@ -38,6 +41,16 @@ if str(PROJECT_ROOT) not in sys.path:
         0,
         str(PROJECT_ROOT)
     )
+
+
+# ============================================================
+# LOAD LOCAL .ENV BEFORE PROJECT IMPORTS
+# ============================================================
+
+load_dotenv(
+    PROJECT_ROOT / ".env",
+    override=False
+)
 
 
 # ============================================================
@@ -104,6 +117,95 @@ if "cv_suggestions" not in st.session_state:
 if "messages" not in st.session_state:
 
     st.session_state.messages = []
+
+
+# ============================================================
+# RESUME VALIDATION
+# ============================================================
+
+def is_valid_resume(text):
+    """Allow analysis only for documents that look like resumes."""
+
+    if not text or len(text.strip()) < 300:
+        return False
+
+    text_lower = text.lower().strip()
+
+    # Reject common non-resume documents.
+    unwanted_phrases = [
+        "capstone project",
+        "project guidelines",
+        "project requirements",
+        "project brief",
+        "project overview",
+        "system architecture",
+        "project directory structure",
+        "implementation guidelines",
+        "course material",
+        "assignment",
+        "documentation",
+        "table of contents",
+        "deliverables",
+        "stretch goals",
+        "notes & constraints",
+        "minimum scope to pass",
+        "datasets & knowledge base",
+        "build timeline",
+    ]
+
+    if any(
+        phrase in text_lower
+        for phrase in unwanted_phrases
+    ):
+        return False
+
+    # A resume should contain several standard sections.
+    resume_sections = [
+        "education",
+        "experience",
+        "work experience",
+        "professional experience",
+        "skills",
+        "technical skills",
+        "projects",
+        "internship",
+        "certifications",
+        "achievements",
+        "objective",
+        "summary",
+    ]
+
+    section_count = sum(
+        1
+        for section in resume_sections
+        if section in text_lower
+    )
+
+    # Require contact information.
+    has_email = bool(
+        re.search(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+            text,
+        )
+    )
+
+    compact_text = re.sub(
+        r"[\s().-]",
+        "",
+        text,
+    )
+
+    has_phone = bool(
+        re.search(
+            r"(?:\+91|91)?[6-9]\d{9}\b",
+            compact_text,
+        )
+    )
+
+    return (
+        section_count >= 3
+        and (has_email or has_phone)
+    )
 
 
 # ============================================================
@@ -213,6 +315,16 @@ if analyze_button:
                 st.error(
                     "Could not extract text from the resume."
                 )
+
+
+            elif not is_valid_resume(resume_text):
+
+                # Do not parse or search non-resume documents.
+                st.session_state.resume_text = ""
+                st.session_state.resume_profile = None
+                st.session_state.job_matches = []
+                st.session_state.cv_suggestions = None
+                st.session_state.messages = []
 
 
             else:

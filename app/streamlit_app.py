@@ -318,6 +318,10 @@ if analyze_button:
 
 
             elif not is_valid_resume(resume_text):
+                st.error(
+    "❌ Invalid file: The uploaded document is not a resume. "
+    "Please upload a valid resume."
+)
 
                 # Do not parse or search non-resume documents.
                 st.session_state.resume_text = ""
